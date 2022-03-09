@@ -1,82 +1,98 @@
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 public class DeltaTwins {
 
     //CHANGE DIRECTORY PATH AND VALUE OF GAMMA HERE
-    private static String directory = "data/rollernet";
+    private static String directory = "data/timeprogressionexcerpt";
     private static int delta = 323;
 
     public static void main(String[] args) {
-
         File f = new File(directory);
-        String filePath;
-
         String[] pathList = f.list();
+
+        if (pathList == null) {
+            throw new RuntimeException("No file dataset found");
+        }
+
         String[] dataSets = new String[pathList.length];
 
         for (int i = 0; i < pathList.length; i++) {
             dataSets[i] = directory + "/" + pathList[i];
-
         }
 
-        ArrayList<String> output = new ArrayList<>();
-        Path fichier = Paths.get("results.csv");
+        // Aggregating all result
+        List<String> header = new ArrayList<String>(
+                Arrays.asList(
+                        "Dataset",
+                        "Number of vertices",
+                        "Number of edges",
+                        "Number of time instants"
+                )
+        );
+        List<List<String>> results = new ArrayList<>();
+        results.add(header);
 
         for (String filepath : dataSets) {
-            String line = new String();
             System.out.println("COMPUTING FOR " + filepath);
-            line = line.concat(filepath + ",");
 
             LinkStream ls = initiate(filepath);
-
-            System.out.println("Number of vertices : " + ls.getVertices().size() + ", Number of edges : " + ls
-                    .getLinks()
-
-                    .size() + ", for " + (ls.getEndInstant() - ls.getStartInstant()) + " instants");
-            line = line.concat(ls.getVertices().size() + "," + ls.getLinks().size() + "," + (ls.getEndInstant() - ls
-                    .getStartInstant
-                            ()) + ",,");
-
+            String vertices = String.valueOf(ls.getVertices().size());
+            String edges = String.valueOf(ls.getLinks().size());
+            String instants = String.valueOf(ls.getEndInstant() - ls.getStartInstant());
+            System.out.println(
+                    "Number of vertices : " + vertices
+                            + ", Number of edges : " + edges
+                            + ", for " + instants + " instants"
+            );
+            // Get computed headers and results here
             DeltaTwins.compute(ls);
-        }
 
+
+            // Create line of result
+            List<String> line = new ArrayList<>(
+                    Arrays.asList(
+                            filepath,
+                            vertices,
+                            edges,
+                            instants
+                    )
+            );
+            results.add(line);
+        }
         try {
-            Files.write(fichier, output, Charset.forName("UTF-8"));
+            ResultBuilder resultBuilder = new ResultBuilder();
+            String filename = "result-" + f.getName();
+            resultBuilder.writeResult(results, filename);
         } catch (IOException e) {
-            System.err.println("Issue while writing the result file");
+            System.out.println(e);
+            System.out.println("Could not write result file");
         }
 
     }
 
-    public static void compute(LinkStream ls) {
-
+    public static ArrayList<String> compute(LinkStream ls) {
         ArrayList<DeltaEdge> deltaTwins = new ArrayList<>();
         ArrayList<String> output = new ArrayList<>();
         String line = new String();
-/*
-        deltaTwins = computeEternalTwinsNaively(ls, line);
-
-        deltaTwins = computeEternalTwinsMEI(ls, line);
-
+//        deltaTwins = computeEternalTwinsNaively(ls, line);
+//        deltaTwins = computeEternalTwinsMEI(ls, line);
         deltaTwins = computeEternalTwinsMLEI(ls, line);
-*/
-        deltaTwins = computeDeltaTwinsNaively(ls, line, delta);
-
-        deltaTwins = computeDeltaTwinsMEI(ls, line, delta);
-
-        deltaTwins = computeDeltaTwinsMLEI(ls, line, delta);
-
+//        deltaTwins = computeDeltaTwinsNaively(ls, line, delta);
+//        deltaTwins = computeDeltaTwinsMEI(ls, line, delta);
+//        deltaTwins = computeDeltaTwinsMLEI(ls, line, delta);
         output.add(line);
-
         System.out.println("Computation done ");
-
+        return output;
     }
 
     static private LinkStream initiate(String filePath) {
@@ -87,8 +103,8 @@ public class DeltaTwins {
             System.err.println("C'est cassé");
         }
 
-        LinkStream ls = fp.getLs();
-        return ls;
+        assert fp != null;
+        return fp.getLs();
 
     }
 
