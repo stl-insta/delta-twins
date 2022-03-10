@@ -5,15 +5,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
+import java.util.function.Function;
 
 public class DeltaTwins {
 
     //CHANGE DIRECTORY PATH AND VALUE OF GAMMA HERE
-    private static String directory = "data/timeprogressionexcerpt";
+    private static String directory = "data/basic";
     private static int delta = 323;
 
     public static void main(String[] args) {
@@ -31,14 +29,7 @@ public class DeltaTwins {
         }
 
         // Aggregating all result
-        List<String> header = new ArrayList<String>(
-                Arrays.asList(
-                        "Dataset",
-                        "Number of vertices",
-                        "Number of edges",
-                        "Number of time instants"
-                )
-        );
+        List<String> header = new ArrayList<String>(Arrays.asList("Dataset", "Number of vertices", "Number of edges", "Number of time instants", "Time elapsed"));
         List<List<String>> results = new ArrayList<>();
         results.add(header);
 
@@ -49,24 +40,12 @@ public class DeltaTwins {
             String vertices = String.valueOf(ls.getVertices().size());
             String edges = String.valueOf(ls.getLinks().size());
             String instants = String.valueOf(ls.getEndInstant() - ls.getStartInstant());
-            System.out.println(
-                    "Number of vertices : " + vertices
-                            + ", Number of edges : " + edges
-                            + ", for " + instants + " instants"
-            );
+            System.out.println("Number of vertices : " + vertices + ", Number of edges : " + edges + ", for " + instants + " instants");
             // Get computed headers and results here
-            DeltaTwins.compute(ls);
-
+            List<String> computationResult = DeltaTwins.compute(ls);
 
             // Create line of result
-            List<String> line = new ArrayList<>(
-                    Arrays.asList(
-                            filepath,
-                            vertices,
-                            edges,
-                            instants
-                    )
-            );
+            List<String> line = new ArrayList<>(Arrays.asList(filepath, vertices, edges, instants));
             results.add(line);
         }
         try {
@@ -74,25 +53,25 @@ public class DeltaTwins {
             String filename = "result-" + f.getName();
             resultBuilder.writeResult(results, filename);
         } catch (IOException e) {
-            System.out.println(e);
+            e.printStackTrace();
             System.out.println("Could not write result file");
         }
 
     }
 
-    public static ArrayList<String> compute(LinkStream ls) {
-        ArrayList<DeltaEdge> deltaTwins = new ArrayList<>();
-        ArrayList<String> output = new ArrayList<>();
-        String line = new String();
-//        deltaTwins = computeEternalTwinsNaively(ls, line);
+    public static List<String> compute(LinkStream ls) {
+        List<DeltaEdge> deltaTwins = new ArrayList<>();
+        List<String> line = new ArrayList<>();
+        line = computeEternalTwinsPartition(ls);
+        System.out.println("Computation done ");
+        //        deltaTwins = computeEternalTwinsNaively(ls, line);
 //        deltaTwins = computeEternalTwinsMEI(ls, line);
-        deltaTwins = computeEternalTwinsMLEI(ls, line);
+//        deltaTwins = computeEternalTwinsMLEI(ls, line);
 //        deltaTwins = computeDeltaTwinsNaively(ls, line, delta);
 //        deltaTwins = computeDeltaTwinsMEI(ls, line, delta);
 //        deltaTwins = computeDeltaTwinsMLEI(ls, line, delta);
-        output.add(line);
-        System.out.println("Computation done ");
-        return output;
+
+        return line;
     }
 
     static private LinkStream initiate(String filePath) {
@@ -106,6 +85,49 @@ public class DeltaTwins {
         assert fp != null;
         return fp.getLs();
 
+    }
+
+    public static List<String> computeEternalTwinsPartition(LinkStream ls) {
+        List<DeltaEdge> eternalTwins = new ArrayList<>();
+        HashMap<Integer, HashMap<Vertex, List<Vertex>>> adjacencyListSuite = new HashMap<>();
+        // Initialization
+        for (TemporalEdge e : ls.getLinks()) {
+            // Adjacency List
+            int index = e.getT() - ls.getStartInstant();
+            HashMap<Vertex, List<Vertex>> adjacencyList;
+            if (!adjacencyListSuite.containsKey(index)) {
+                adjacencyList = new HashMap<>();
+            } else {
+                adjacencyList = adjacencyListSuite.get(index);
+            }
+
+            // Edges of V
+            List<Vertex> edgeUList;
+            Vertex U = e.getU();
+            if(!adjacencyList.containsKey(U)) {
+                edgeUList = new ArrayList<>();
+            } else {
+                edgeUList = adjacencyList.get(U);
+            }
+
+            // Edges of V
+            List<Vertex> edgeVList;
+            Vertex V = e.getV();
+            if(!adjacencyList.containsKey(V)) {
+                edgeVList = new ArrayList<>();
+            } else {
+                edgeVList = adjacencyList.get(V);
+            }
+
+            edgeVList.add(U);
+            adjacencyList.put(V, edgeVList);
+            edgeUList.add(V);
+            adjacencyList.put(U, edgeUList);
+            adjacencyListSuite.put(index, adjacencyList);
+        }
+
+
+        return new ArrayList<String>();
     }
 
     public static ArrayList<DeltaEdge> computeEternalTwinsNaively(LinkStream ls, String line) {
@@ -145,23 +167,15 @@ public class DeltaTwins {
         return deltaTwins;
     }
 
-    public static ArrayList<DeltaEdge> computeEternalTwinsMLEI(LinkStream ls, String line) {
-
-        System.out.println("COMPUTING ETERNAL TWINS USING EDGES ITERATION WITHOUT MATRICES");
-        ArrayList<DeltaEdge> deltaTwins = new ArrayList<>();
-
+    public static List<String> computeEternalTwinsMLEI(LinkStream ls) {
+        TwinAlgorithms algorithms = new TwinAlgorithms();
+        List<String> line = new ArrayList<>();
         try {
-            Date startTime = new Date();
-            deltaTwins = TwinAlgorithms.computeEternalTwinsByEdgesIterationWithoutMatrices(ls);
-            Date endTime = new Date();
-            long timeElapsed = endTime.getTime() - startTime.getTime();
-            line = line.concat(timeElapsed + ",,");
-        } catch (OutOfMemoryError e) {
-            System.err.println("Out of memory");
-            line = line.concat("OUT OF MEMORY,,");
+            line = ComputationFactory.launchComputation(ls, "ETERNAL TWINS MLEI", algorithms, "computeEternalTwinsByEdgesIterationWithoutMatrices");
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
         }
-        System.out.println("We have " + deltaTwins.size() + " eternal twins");
-        return deltaTwins;
+        return line;
     }
 
     public static ArrayList<DeltaEdge> computeDeltaTwinsNaively(LinkStream ls, String line, int delta) {
