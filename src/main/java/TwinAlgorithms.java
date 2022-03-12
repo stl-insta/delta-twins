@@ -1,9 +1,63 @@
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
+import java.util.*;
 
 
 public class TwinAlgorithms {
+
+
+    public static ArrayList<DeltaEdge> computeEternalTwinsPartition(LinkStream ls) {
+        ArrayList<DeltaEdge> eternalTwins = new ArrayList<>();
+
+        HashMap<Integer, HashMap<Vertex, List<Vertex>>> adjacencyListSuite = new HashMap<>();
+        // Adjacency List Construction
+        for (TemporalEdge e : ls.getLinks()) {
+            // Adjacency List
+            int index = e.getT() - ls.getStartInstant();
+            HashMap<Vertex, List<Vertex>> adjacencyList;
+            if (!adjacencyListSuite.containsKey(index)) {
+                adjacencyList = new HashMap<>();
+            } else {
+                adjacencyList = adjacencyListSuite.get(index);
+            }
+
+            // Edges of V
+            List<Vertex> edgeUList;
+            Vertex U = e.getU();
+            if (!adjacencyList.containsKey(U)) {
+                edgeUList = new ArrayList<>();
+            } else {
+                edgeUList = adjacencyList.get(U);
+            }
+
+            // Edges of V
+            List<Vertex> edgeVList;
+            Vertex V = e.getV();
+            if (!adjacencyList.containsKey(V)) {
+                edgeVList = new ArrayList<>();
+            } else {
+                edgeVList = adjacencyList.get(V);
+            }
+
+            edgeVList.add(U);
+            adjacencyList.put(V, edgeVList);
+            edgeUList.add(V);
+            adjacencyList.put(U, edgeUList);
+            adjacencyListSuite.put(index, adjacencyList);
+        }
+
+        // Partition refinement
+        for (var entry : adjacencyListSuite.entrySet()) {
+            int time = entry.getKey();
+            var part = Partition.refine(adjacencyListSuite.get(time));
+
+            // Extract twins : Partition of size 2
+            for (var set: part) {
+                if(set.size() != 2) continue;
+                var list = new ArrayList<>(set);
+                eternalTwins.add(new DeltaEdge(time, time, list.get(0), list.get(1)));
+            }
+        }
+        return eternalTwins;
+    }
 
 
     public static ArrayList<DeltaEdge> naivelyComputeEternalTwins(LinkStream ls) {
@@ -75,7 +129,7 @@ public class TwinAlgorithms {
         return twins;
     }
 
-    public static ArrayList<DeltaEdge> computeEternalTwinsByEdgesIterationWithoutMatrices(LinkStream ls) {
+    public ArrayList<DeltaEdge> computeEternalTwinsByEdgesIterationWithoutMatrices(LinkStream ls) {
         Date startTime = new Date();
 
         int[][] twinCandidates = new int[ls.getVertices().size()][ls.getVertices().size()];
@@ -91,8 +145,7 @@ public class TwinAlgorithms {
                 ArrayList<TemporalEdge> newList = new ArrayList<>();
                 newList.add(e);
                 mapEdgeByInstant.put(e.getT(), newList);
-            }
-            else {
+            } else {
                 mapEdgeByInstant.get(e.getT()).add(e);
             }
         }
@@ -104,10 +157,10 @@ public class TwinAlgorithms {
                     boolean linkUexists = false;
                     boolean linkVexists = false;
                     for (TemporalEdge f : mapEdgeByInstant.get(e.getT())) {
-                        if ((twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getV())] == 1) && (((f.getU().equals(z)) && (f.getV().equals(e.getU()))) ||((f.getU().equals(e.getU())) && (f.getV().equals(z))))) {
+                        if ((twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getV())] == 1) && (((f.getU().equals(z)) && (f.getV().equals(e.getU()))) || ((f.getU().equals(e.getU())) && (f.getV().equals(z))))) {
                             linkUexists = true;
                         }
-                        if ((twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getU())] == 1) && (((f.getU().equals(z)) && (f.getV().equals(e.getV()))) ||((f.getU().equals(e.getV())) && (f.getV().equals(z))))) {
+                        if ((twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getU())] == 1) && (((f.getU().equals(z)) && (f.getV().equals(e.getV()))) || ((f.getU().equals(e.getV())) && (f.getV().equals(z))))) {
                             linkVexists = true;
                         }
                         if (linkUexists && linkVexists) {
@@ -175,7 +228,7 @@ public class TwinAlgorithms {
         System.out.println("Time elapsed : " + timeElapsed);
         return deltaTwins;
     }
-    
+
     public static ArrayList<DeltaEdge> computeDeltaTwinsByEdgesIteration(LinkStream ls, int delta) {
         Date startTime = new Date();
 
@@ -185,25 +238,23 @@ public class TwinAlgorithms {
         for (TemporalEdge e : ls.getLinks()) {
             for (Vertex z : ls.getVertices()) {
                 if ((!z.equals(e.getU())) && (!z.equals(e.getV()))) {
-                        if (ls.getMatrixSuite().get(e.getT() - ls.getStartInstant())[ls.getVertices().indexOf(z)][ls
-                                .getVertices().indexOf(e.getV())] == 0) {
-                            if (twinCandidates[ls.getVertices().indexOf(e.getU())][ls.getVertices().indexOf(z)] == null) {
-                                twinCandidates[ls.getVertices().indexOf(e.getU())][ls.getVertices().indexOf(z)] = new TimePartition(e.getT(), e.getT(), ls.getStartInstant(), ls.getEndInstant());
-                                twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getU())] = new TimePartition(e.getT(), e.getT(), ls.getStartInstant(), ls.getEndInstant());
-                            }
-                            else {
-                                twinCandidates[ls.getVertices().indexOf(e.getU())][ls.getVertices().indexOf(z)].removeInstant(e.getT(), delta);
-                                twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getU())].removeInstant(e.getT(), delta);
-                            }
+                    if (ls.getMatrixSuite().get(e.getT() - ls.getStartInstant())[ls.getVertices().indexOf(z)][ls
+                            .getVertices().indexOf(e.getV())] == 0) {
+                        if (twinCandidates[ls.getVertices().indexOf(e.getU())][ls.getVertices().indexOf(z)] == null) {
+                            twinCandidates[ls.getVertices().indexOf(e.getU())][ls.getVertices().indexOf(z)] = new TimePartition(e.getT(), e.getT(), ls.getStartInstant(), ls.getEndInstant());
+                            twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getU())] = new TimePartition(e.getT(), e.getT(), ls.getStartInstant(), ls.getEndInstant());
+                        } else {
+                            twinCandidates[ls.getVertices().indexOf(e.getU())][ls.getVertices().indexOf(z)].removeInstant(e.getT(), delta);
+                            twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getU())].removeInstant(e.getT(), delta);
                         }
+                    }
 
                     if (ls.getMatrixSuite().get(e.getT() - ls.getStartInstant())[ls.getVertices().indexOf(z)][ls
                             .getVertices().indexOf(e.getU())] == 0) {
                         if (twinCandidates[ls.getVertices().indexOf(e.getV())][ls.getVertices().indexOf(z)] == null) {
                             twinCandidates[ls.getVertices().indexOf(e.getV())][ls.getVertices().indexOf(z)] = new TimePartition(e.getT(), e.getT(), ls.getStartInstant(), ls.getEndInstant());
                             twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getV())] = new TimePartition(e.getT(), e.getT(), ls.getStartInstant(), ls.getEndInstant());
-                        }
-                        else {
+                        } else {
                             twinCandidates[ls.getVertices().indexOf(e.getV())][ls.getVertices().indexOf(z)].removeInstant(e.getT(), delta);
                             twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getV())].removeInstant(e.getT(), delta);
                         }
@@ -212,7 +263,7 @@ public class TwinAlgorithms {
             }
         }
 
-         ArrayList<DeltaEdge> twins = new ArrayList<>();
+        ArrayList<DeltaEdge> twins = new ArrayList<>();
 
         for (int i = 0; i < ls.getVertices().size(); i++) {
             for (int j = i + 1; j < ls.getVertices().size(); j++) {
@@ -222,8 +273,7 @@ public class TwinAlgorithms {
 
                         twins.add(e);
                     }
-                }
-                else {
+                } else {
                     if (!twinCandidates[i][j].getAllDeltaIntervals(delta).isEmpty()) {
                         for (DeltaEdge e : twinCandidates[i][j].getAllDeltaIntervals(delta)) {
                             e.setU(ls.getVertices().get(i));
@@ -250,8 +300,7 @@ public class TwinAlgorithms {
                 ArrayList<TemporalEdge> newList = new ArrayList<>();
                 newList.add(e);
                 mapEdgeByInstant.put(e.getT(), newList);
-            }
-            else {
+            } else {
                 mapEdgeByInstant.get(e.getT()).add(e);
             }
         }
@@ -263,15 +312,15 @@ public class TwinAlgorithms {
                     boolean linkUexists = false;
                     boolean linkVexists = false;
                     for (TemporalEdge f : mapEdgeByInstant.get(e.getT())) {
-                            if (((f.getU().equals(z)) && (f.getV().equals(e.getU()))) ||((f.getU().equals(e.getU())) && (f.getV().equals(z)))) {
-                                linkUexists = true;
-                            }
-                            if (((f.getU().equals(z)) && (f.getV().equals(e.getV()))) ||((f.getU().equals(e.getV())) && (f.getV().equals(z)))) {
-                                linkVexists = true;
-                            }
-                            if (linkUexists && linkVexists) {
-                                break;
-                            }
+                        if (((f.getU().equals(z)) && (f.getV().equals(e.getU()))) || ((f.getU().equals(e.getU())) && (f.getV().equals(z)))) {
+                            linkUexists = true;
+                        }
+                        if (((f.getU().equals(z)) && (f.getV().equals(e.getV()))) || ((f.getU().equals(e.getV())) && (f.getV().equals(z)))) {
+                            linkVexists = true;
+                        }
+                        if (linkUexists && linkVexists) {
+                            break;
+                        }
 
                     }
 
@@ -279,8 +328,7 @@ public class TwinAlgorithms {
                         if (twinCandidates[ls.getVertices().indexOf(e.getU())][ls.getVertices().indexOf(z)] == null) {
                             twinCandidates[ls.getVertices().indexOf(e.getU())][ls.getVertices().indexOf(z)] = new TimePartition(e.getT(), e.getT(), ls.getStartInstant(), ls.getEndInstant());
                             twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getU())] = new TimePartition(e.getT(), e.getT(), ls.getStartInstant(), ls.getEndInstant());
-                        }
-                        else {
+                        } else {
                             twinCandidates[ls.getVertices().indexOf(e.getU())][ls.getVertices().indexOf(z)].removeInstant(e.getT(), delta);
                             twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getU())].removeInstant(e.getT(), delta);
                         }
@@ -289,8 +337,7 @@ public class TwinAlgorithms {
                         if (twinCandidates[ls.getVertices().indexOf(e.getV())][ls.getVertices().indexOf(z)] == null) {
                             twinCandidates[ls.getVertices().indexOf(e.getV())][ls.getVertices().indexOf(z)] = new TimePartition(e.getT(), e.getT(), ls.getStartInstant(), ls.getEndInstant());
                             twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getV())] = new TimePartition(e.getT(), e.getT(), ls.getStartInstant(), ls.getEndInstant());
-                        }
-                        else {
+                        } else {
                             twinCandidates[ls.getVertices().indexOf(e.getV())][ls.getVertices().indexOf(z)].removeInstant(e.getT(), delta);
                             twinCandidates[ls.getVertices().indexOf(z)][ls.getVertices().indexOf(e.getV())].removeInstant(e.getT(), delta);
                         }
@@ -310,8 +357,7 @@ public class TwinAlgorithms {
 
                         twins.add(e);
                     }
-                }
-                else {
+                } else {
                     if (!twinCandidates[i][j].getAllDeltaIntervals(delta).isEmpty()) {
                         for (DeltaEdge e : twinCandidates[i][j].getAllDeltaIntervals(delta)) {
                             e.setU(ls.getVertices().get(i));
