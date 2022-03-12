@@ -11,8 +11,11 @@ import java.util.function.Function;
 public class DeltaTwins {
 
     //CHANGE DIRECTORY PATH AND VALUE OF GAMMA HERE
-    private static String directory = "data/basic";
+    private static String directory = "data/timeprogression";
     private static int delta = 323;
+    private static List<String>
+            header = new ArrayList<>(Arrays.asList("Dataset", "Number of vertices", "Number of edges", "Number of time instants"));
+
 
     public static void main(String[] args) {
         File f = new File(directory);
@@ -27,10 +30,12 @@ public class DeltaTwins {
         for (int i = 0; i < pathList.length; i++) {
             dataSets[i] = directory + "/" + pathList[i];
         }
-
         // Aggregating all result
-        List<String> header = new ArrayList<String>(Arrays.asList("Dataset", "Number of vertices", "Number of edges", "Number of time instants", "Time elapsed"));
         List<List<String>> results = new ArrayList<>();
+        // Add computation correct header here
+        header.add("Partition Eternal-twins computation time (ms)");
+//        header.add("MEI Eternal-twins computation time (ms)");
+        header.add("MLEI Eternal-twins computation time (ms)");
         results.add(header);
 
         for (String filepath : dataSets) {
@@ -41,16 +46,16 @@ public class DeltaTwins {
             String edges = String.valueOf(ls.getLinks().size());
             String instants = String.valueOf(ls.getEndInstant() - ls.getStartInstant());
             System.out.println("Number of vertices : " + vertices + ", Number of edges : " + edges + ", for " + instants + " instants");
-            // Get computed headers and results here
-            List<String> computationResult = DeltaTwins.compute(ls);
+
+            List<String> line = new ArrayList<>(Arrays.asList(filepath, vertices, edges, instants));
+            DeltaTwins.compute(ls, line);
 
             // Create line of result
-            List<String> line = new ArrayList<>(Arrays.asList(filepath, vertices, edges, instants));
             results.add(line);
         }
         try {
             ResultBuilder resultBuilder = new ResultBuilder();
-            String filename = "result-" + f.getName();
+            String filename = "result-" + f.getName() + ".csv";
             resultBuilder.writeResult(results, filename);
         } catch (IOException e) {
             e.printStackTrace();
@@ -59,19 +64,19 @@ public class DeltaTwins {
 
     }
 
-    public static List<String> compute(LinkStream ls) {
-        List<DeltaEdge> deltaTwins = new ArrayList<>();
-        List<String> line = new ArrayList<>();
-        line = computeEternalTwinsPartition(ls);
+    public static void compute(LinkStream ls, List<String> line) {
+        List<List<DeltaEdge>> eternalTwins = new ArrayList<>();
+        eternalTwins.add(computeEternalTwinsPartition(ls, line));
+//        eternalTwins.add(computeEternalTwinsMEI(ls, line));
+        eternalTwins.add(computeEternalTwinsMLEI(ls, line));
         System.out.println("Computation done ");
-        //        deltaTwins = computeEternalTwinsNaively(ls, line);
-//        deltaTwins = computeEternalTwinsMEI(ls, line);
-//        deltaTwins = computeEternalTwinsMLEI(ls, line);
+//        deltaTwins = computeEternalTwinsNaively(ls, line);
 //        deltaTwins = computeDeltaTwinsNaively(ls, line, delta);
 //        deltaTwins = computeDeltaTwinsMEI(ls, line, delta);
 //        deltaTwins = computeDeltaTwinsMLEI(ls, line, delta);
 
-        return line;
+        // Assert that all computations have the same results
+        assert (eternalTwins.stream().allMatch(t -> eternalTwins.get(0).size() == t.size()));
     }
 
     static private LinkStream initiate(String filePath) {
@@ -87,51 +92,24 @@ public class DeltaTwins {
 
     }
 
-    public static List<String> computeEternalTwinsPartition(LinkStream ls) {
-        List<DeltaEdge> eternalTwins = new ArrayList<>();
-        HashMap<Integer, HashMap<Vertex, List<Vertex>>> adjacencyListSuite = new HashMap<>();
-        // Initialization
-        for (TemporalEdge e : ls.getLinks()) {
-            // Adjacency List
-            int index = e.getT() - ls.getStartInstant();
-            HashMap<Vertex, List<Vertex>> adjacencyList;
-            if (!adjacencyListSuite.containsKey(index)) {
-                adjacencyList = new HashMap<>();
-            } else {
-                adjacencyList = adjacencyListSuite.get(index);
-            }
-
-            // Edges of V
-            List<Vertex> edgeUList;
-            Vertex U = e.getU();
-            if(!adjacencyList.containsKey(U)) {
-                edgeUList = new ArrayList<>();
-            } else {
-                edgeUList = adjacencyList.get(U);
-            }
-
-            // Edges of V
-            List<Vertex> edgeVList;
-            Vertex V = e.getV();
-            if(!adjacencyList.containsKey(V)) {
-                edgeVList = new ArrayList<>();
-            } else {
-                edgeVList = adjacencyList.get(V);
-            }
-
-            edgeVList.add(U);
-            adjacencyList.put(V, edgeVList);
-            edgeUList.add(V);
-            adjacencyList.put(U, edgeUList);
-            adjacencyListSuite.put(index, adjacencyList);
+    public static List<DeltaEdge> computeEternalTwinsPartition(LinkStream ls, List<String> line) {
+        System.out.println("COMPUTING ETERNAL TWINS PARTITION");
+        ArrayList<DeltaEdge> eternalTwins = new ArrayList<>();
+        try {
+            Date startTime = new Date();
+            eternalTwins = TwinAlgorithms.computeEternalTwinsPartition(ls);
+            Date endTime = new Date();
+            long timeElapsed = endTime.getTime() - startTime.getTime();
+            line.add(String.valueOf(timeElapsed));
+        } catch (OutOfMemoryError e) {
+            System.err.println("Out of memory");
+            line.add("OUT OF MEMORY");
         }
-
-
-        return new ArrayList<String>();
+        System.out.println("We have " + eternalTwins.size() + " eternal twins");
+        return eternalTwins;
     }
 
     public static ArrayList<DeltaEdge> computeEternalTwinsNaively(LinkStream ls, String line) {
-
         System.out.println("COMPUTING ETERNAL TWINS NAIVELY");
         ArrayList<DeltaEdge> deltaTwins = new ArrayList<>();
         try {
@@ -149,8 +127,7 @@ public class DeltaTwins {
         return deltaTwins;
     }
 
-    public static ArrayList<DeltaEdge> computeEternalTwinsMEI(LinkStream ls, String line) {
-
+    public static List<DeltaEdge> computeEternalTwinsMEI(LinkStream ls, List<String> line) {
         System.out.println("COMPUTING ETERNAL TWINS USING EDGES ITERATION");
         ArrayList<DeltaEdge> deltaTwins = new ArrayList<>();
         try {
@@ -158,24 +135,30 @@ public class DeltaTwins {
             deltaTwins = TwinAlgorithms.computeEternalTwinsByEdgesIteration(ls);
             Date endTime = new Date();
             long timeElapsed = endTime.getTime() - startTime.getTime();
-            line = line.concat(timeElapsed + ",");
+            line.add(String.valueOf(timeElapsed));
         } catch (OutOfMemoryError e) {
             System.err.println("Out of memory");
-            line = line.concat("OUT OF MEMORY,");
+            line.add("OUT OF MEMORY,");
         }
         System.out.println("We have " + deltaTwins.size() + " eternal twins");
         return deltaTwins;
     }
 
-    public static List<String> computeEternalTwinsMLEI(LinkStream ls) {
-        TwinAlgorithms algorithms = new TwinAlgorithms();
-        List<String> line = new ArrayList<>();
+    public static List<DeltaEdge> computeEternalTwinsMLEI(LinkStream ls, List<String> line) {
+        System.out.println("COMPUTING ETERNAL TWINS USING MATRIX LESS EDGES ITERATION");
+        ArrayList<DeltaEdge> deltaTwins = new ArrayList<>();
         try {
-            line = ComputationFactory.launchComputation(ls, "ETERNAL TWINS MLEI", algorithms, "computeEternalTwinsByEdgesIterationWithoutMatrices");
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
+            Date startTime = new Date();
+            deltaTwins = TwinAlgorithms.computeEternalTwinsByEdgesIterationWithoutMatrices(ls);
+            Date endTime = new Date();
+            long timeElapsed = endTime.getTime() - startTime.getTime();
+            line.add(String.valueOf(timeElapsed));
+        } catch (OutOfMemoryError e) {
+            System.err.println("Out of memory");
+            line.add("OUT OF MEMORY,");
         }
-        return line;
+        System.out.println("We have " + deltaTwins.size() + " eternal twins");
+        return deltaTwins;
     }
 
     public static ArrayList<DeltaEdge> computeDeltaTwinsNaively(LinkStream ls, String line, int delta) {
