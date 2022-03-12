@@ -3,57 +3,31 @@ import java.util.*;
 
 public class TwinAlgorithms {
 
-
     public static ArrayList<DeltaEdge> computeEternalTwinsPartition(LinkStream ls) {
         ArrayList<DeltaEdge> eternalTwins = new ArrayList<>();
+        SortedMap<Integer, HashMap<Vertex, List<Vertex>>> adjacencyListSuite = Partition.computeAdjacencyListSuite(ls);
+        // Compute two modules with partition refinement
+        SortedMap<Integer, Set<Set<Vertex>>> twoModulesSet = Partition.computeTwoModules(adjacencyListSuite);
+        // Extract eternal twins
+        // We know that they are eternal twins iff they are 2-modules for every t in T
+        if (twoModulesSet.get(0) == null) return eternalTwins;
 
-        HashMap<Integer, HashMap<Vertex, List<Vertex>>> adjacencyListSuite = new HashMap<>();
-        // Adjacency List Construction
-        for (TemporalEdge e : ls.getLinks()) {
-            // Adjacency List
-            int index = e.getT() - ls.getStartInstant();
-            HashMap<Vertex, List<Vertex>> adjacencyList;
-            if (!adjacencyListSuite.containsKey(index)) {
-                adjacencyList = new HashMap<>();
-            } else {
-                adjacencyList = adjacencyListSuite.get(index);
+        // Eternal twins are 2-modules in the first static graph that appears in every static graphs
+        for (var firstStaticGraph : twoModulesSet.get(0)) {
+            boolean isEternal = true;
+            for (var twoModules: twoModulesSet.entrySet()) {
+                int time = twoModules.getKey();
+                if(time != 0) {
+                    var currentStaticGraphSet = twoModulesSet.get(time);
+                    if(!currentStaticGraphSet.contains(firstStaticGraph)) {
+                        isEternal = false;
+                        break;
+                    }
+                }
             }
-
-            // Edges of V
-            List<Vertex> edgeUList;
-            Vertex U = e.getU();
-            if (!adjacencyList.containsKey(U)) {
-                edgeUList = new ArrayList<>();
-            } else {
-                edgeUList = adjacencyList.get(U);
-            }
-
-            // Edges of V
-            List<Vertex> edgeVList;
-            Vertex V = e.getV();
-            if (!adjacencyList.containsKey(V)) {
-                edgeVList = new ArrayList<>();
-            } else {
-                edgeVList = adjacencyList.get(V);
-            }
-
-            edgeVList.add(U);
-            adjacencyList.put(V, edgeVList);
-            edgeUList.add(V);
-            adjacencyList.put(U, edgeUList);
-            adjacencyListSuite.put(index, adjacencyList);
-        }
-
-        // Partition refinement
-        for (var entry : adjacencyListSuite.entrySet()) {
-            int time = entry.getKey();
-            var part = Partition.refine(adjacencyListSuite.get(time));
-
-            // Extract twins : Partition of size 2
-            for (var set: part) {
-                if(set.size() != 2) continue;
-                var list = new ArrayList<>(set);
-                eternalTwins.add(new DeltaEdge(time, time, list.get(0), list.get(1)));
+            if(isEternal) {
+                var twoModules = new ArrayList<>(firstStaticGraph);
+                eternalTwins.add(new DeltaEdge(0, ls.getEndInstant(), twoModules.get(0), twoModules.get(1)));
             }
         }
         return eternalTwins;
@@ -129,7 +103,7 @@ public class TwinAlgorithms {
         return twins;
     }
 
-    public ArrayList<DeltaEdge> computeEternalTwinsByEdgesIterationWithoutMatrices(LinkStream ls) {
+    public static ArrayList<DeltaEdge> computeEternalTwinsByEdgesIterationWithoutMatrices(LinkStream ls) {
         Date startTime = new Date();
 
         int[][] twinCandidates = new int[ls.getVertices().size()][ls.getVertices().size()];
