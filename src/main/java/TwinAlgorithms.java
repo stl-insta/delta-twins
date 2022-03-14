@@ -8,24 +8,25 @@ public class TwinAlgorithms {
         SortedMap<Integer, HashMap<Vertex, List<Vertex>>> adjacencyListSuite = Partition.computeAdjacencyListSuite(ls);
         // Compute two modules with partition refinement
         SortedMap<Integer, Set<Set<Vertex>>> twoModulesSet = Partition.computeTwoModules(adjacencyListSuite);
+
+        if (twoModulesSet.get(0) == null) return eternalTwins;
         // Extract eternal twins
         // We know that they are eternal twins iff they are 2-modules for every t in T
-        if (twoModulesSet.get(0) == null) return eternalTwins;
-
         // Eternal twins are 2-modules in the first static graph that appears in every static graphs
-        for (var firstStaticGraph : twoModulesSet.get(0)) {
+        var t0 = twoModulesSet.firstKey();
+        for (var firstStaticGraph : twoModulesSet.get(t0)) {
             boolean isEternal = true;
-            for (var twoModules: twoModulesSet.entrySet()) {
+            for (var twoModules : twoModulesSet.entrySet()) {
                 int time = twoModules.getKey();
-                if(time != 0) {
+                if (time != t0) {
                     var currentStaticGraphSet = twoModulesSet.get(time);
-                    if(!currentStaticGraphSet.contains(firstStaticGraph)) {
+                    if (!currentStaticGraphSet.contains(firstStaticGraph)) {
                         isEternal = false;
                         break;
                     }
                 }
             }
-            if(isEternal) {
+            if (isEternal) {
                 var twoModules = new ArrayList<>(firstStaticGraph);
                 eternalTwins.add(new DeltaEdge(0, ls.getEndInstant(), twoModules.get(0), twoModules.get(1)));
             }

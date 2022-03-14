@@ -49,8 +49,9 @@ public class Partition {
     /**
      * P = {X1,X2,Xn}
      * Refine(P,N(x))
+     * Time complexity: O(|V|+|E|)
      */
-    public static Set<Set<Vertex>> refine(Map<Vertex, List<Vertex>> adjacencyList) {
+    private static Set<Set<Vertex>> refine(Map<Vertex, List<Vertex>> adjacencyList) {
         Set<Vertex> vertices = adjacencyList.keySet();
         Set<Set<Vertex>> refined = new HashSet<>();
         refined.add(vertices);
@@ -78,16 +79,44 @@ public class Partition {
     }
 
 
+    /**
+     * Compute a map of time -> two modules from partitioning each adjacency entry
+     * Each partition contains a pair of two modules after an enumeration
+     * Time complexity: O(|V|*?)
+     */
     public static SortedMap<Integer, Set<Set<Vertex>>> computeTwoModules(SortedMap<Integer, HashMap<Vertex, List<Vertex>>> adjacencyListSuite) {
         SortedMap<Integer, Set<Set<Vertex>>> twoModules = new TreeMap<>();
         for(var adjacencyList: adjacencyListSuite.entrySet()) {
             int time = adjacencyList.getKey();
-            var part = Partition.refine(adjacencyListSuite.get(time));
-            // Extract twins : Partition of size 2
-            for (var set : part) {
-                if (set.size() != 2) continue;
+            var partition = Partition.refine(adjacencyListSuite.get(time));
+
+            // Partitions of size < 2 are rejected
+            // Create new set for partitions of size > 2
+            for (var p : partition) {
+                if (p.size() < 2) continue;
                 twoModules.computeIfAbsent(time, k -> new HashSet<>());
-                twoModules.get(time).add(set);
+                twoModules.put(time, enumerateTwoModules(p));
+            }
+        }
+        return twoModules;
+    }
+
+    /**
+     * Extract two modules from a partition
+     * A module may contain 2 or more vertex,
+     * hence we need to enumerate each distinct
+     * 2 vertices that might form an eternal twin.
+     * Time complexity: O(|partition|^2)
+     */
+    private static Set<Set<Vertex>> enumerateTwoModules(Set<Vertex> partition) {
+        Set<Set<Vertex>> twoModules = new HashSet<>();
+        for(var p1: partition) {
+            for(var p2: partition) {
+                if(p1 == p2) continue;
+                var couple = new HashSet<Vertex>();
+                couple.add(p1);
+                couple.add(p2);
+                twoModules.add(couple);
             }
         }
         return twoModules;

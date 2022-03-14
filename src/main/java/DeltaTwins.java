@@ -1,33 +1,18 @@
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
-import java.util.function.Function;
-
-import static java.lang.System.exit;
 
 public class DeltaTwins {
     private static int delta = 0;
-    private static String directory;
+    private static String directory = "data/basic";
 
-    private static List<String>
+    private static final List<String>
             header = new ArrayList<>(Arrays.asList("Dataset", "Number of vertices", "Number of edges", "Number of time instants"));
 
     public static void main(String[] args) {
-        directory = args[0];
-        try {
+        if(args.length == 2)  {
+            directory = args[0];
             delta = Integer.parseInt(args[1]);
-        } catch(NumberFormatException ex) {
-            delta = 0;
-        }
-
-        if(directory == null) {
-            System.err.println("No dataset provided");
-            exit(1);
         }
 
         File f = new File(directory);
@@ -46,7 +31,7 @@ public class DeltaTwins {
         List<List<String>> results = new ArrayList<>();
         // Add computation correct header here
         header.add("Partition Eternal-twins computation time (ms)");
-        header.add("MEI Eternal-twins computation time (ms)");
+//        header.add("MEI Eternal-twins computation time (ms)");
         header.add("MLEI Eternal-twins computation time (ms)");
         results.add(header);
 
@@ -79,16 +64,13 @@ public class DeltaTwins {
     public static void compute(LinkStream ls, List<String> line) {
         List<List<DeltaEdge>> eternalTwins = new ArrayList<>();
         eternalTwins.add(computeEternalTwinsPartition(ls, line));
-        eternalTwins.add(computeEternalTwinsMEI(ls, line));
+//        eternalTwins.add(computeEternalTwinsMEI(ls, line));
         eternalTwins.add(computeEternalTwinsMLEI(ls, line));
-        System.out.println("Computation done ");
-//        deltaTwins = computeEternalTwinsNaively(ls, line);
+//        eternalTwins = computeEternalTwinsNaively(ls, line);
 //        deltaTwins = computeDeltaTwinsNaively(ls, line, delta);
 //        deltaTwins = computeDeltaTwinsMEI(ls, line, delta);
 //        deltaTwins = computeDeltaTwinsMLEI(ls, line, delta);
-
-        // Assert that all computations have the same results
-        assert (eternalTwins.stream().allMatch(t -> eternalTwins.get(0).size() == t.size()));
+        System.out.println("Computation done ");
     }
 
     static private LinkStream initiate(String filePath) {
