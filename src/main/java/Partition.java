@@ -8,6 +8,7 @@ public class Partition {
     // We use SortedMap to preserve time instants
     public static SortedMap<Integer, HashMap<Vertex, List<Vertex>>> computeAdjacencyListSuite(LinkStream ls) {
         SortedMap<Integer, HashMap<Vertex, List<Vertex>>> adjacencyListSuite = new TreeMap<>();
+        // Create graph for non existing time
         // Adjacency List Construction
         for (TemporalEdge e : ls.getLinks()) {
             // Adjacency List
@@ -42,6 +43,16 @@ public class Partition {
             edgeUList.add(V);
             adjacencyList.put(U, edgeUList);
             adjacencyListSuite.put(index, adjacencyList);
+        }
+        int startTime = ls.getStartInstant();
+        int endTime = ls.getEndInstant();
+        var vertex = ls.getVertices();
+        HashMap<Vertex, List<Vertex>> emptyGraph = new HashMap<>();
+        for(var v: vertex) {
+            emptyGraph.put(v, new ArrayList<>());
+        }
+        for(; startTime<endTime; startTime++){
+            adjacencyListSuite.computeIfAbsent(startTime, k-> emptyGraph);
         }
         return adjacencyListSuite;
     }

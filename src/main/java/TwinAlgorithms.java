@@ -28,7 +28,7 @@ public class TwinAlgorithms {
             }
             if (isEternal) {
                 var twoModules = new ArrayList<>(firstStaticGraph);
-                eternalTwins.add(new DeltaEdge(0, ls.getEndInstant(), twoModules.get(0), twoModules.get(1)));
+                eternalTwins.add(new DeltaEdge(ls.getStartInstant(), ls.getEndInstant(), twoModules.get(0), twoModules.get(1)));
             }
         }
         return eternalTwins;
